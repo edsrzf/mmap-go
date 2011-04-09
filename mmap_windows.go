@@ -71,7 +71,7 @@ const (
 	_FILE_MAP_EXECUTE    = 0x20
 )
 
-func mmap(len int64, prot, flags, hfile uintptr, off int64) (uintptr, os.Error) {
+func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, os.Error) {
 	flProtect := uintptr(_PAGE_READONLY)
 	dwDesiredAccess := uintptr(_FILE_MAP_READ)
 	switch {
@@ -88,20 +88,28 @@ func mmap(len int64, prot, flags, hfile uintptr, off int64) (uintptr, os.Error) 
 	}
 
 	// TODO: Do we need to set some security attributes? It might help portability.
-	h, _, errno := syscall.Syscall6(procCreateFileMapping, 6, uintptr(hfile), 0, flProtect, uintptr(len>>32), uintptr(len&0xFFFFFFFF), 0)
+	h, _, errno := syscall.Syscall6(procCreateFileMapping, 6, uintptr(hfile), 0, flProtect, 0, uintptr(len), 0)
 	if h == 0 {
-		return 0, os.NewSyscallError("CreateFileMapping", int(errno))
+		return nil, os.NewSyscallError("CreateFileMapping", int(errno))
 	}
 
 	addr, _, errno := syscall.Syscall6(procMapViewOfFile, 5, h, dwDesiredAccess, uintptr(off>>32), uintptr(off&0xFFFFFFFF), uintptr(len), 0)
 	if addr == 0 {
-		return 0, os.NewSyscallError("MapViewOfFile", int(errno))
+		return nil, os.NewSyscallError("MapViewOfFile", int(errno))
 	}
 	handleLock.Lock()
 	handleMap[addr] = int32(h)
 	handleLock.Unlock()
 
-	return addr, nil
+
+	m := MMap{}
+	dh := m.header()
+	dh.Data = addr
+	// TODO: eek, truncation
+	dh.Len = int(len)
+	dh.Cap = dh.Len
+
+	return m, nil
 }
 
 func flush(addr, len uintptr) os.Error {

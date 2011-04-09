@@ -43,6 +43,8 @@ const (
 type MMap []byte
 
 // Map maps an entire file into memory.
+// Note that because of runtime limitations, no file larger than about 2GB can
+// be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
 func Map(f *os.File, prot, flags int) (MMap, os.Error) {
 	return MapRegion(f, -1, prot, flags, 0)
@@ -51,8 +53,10 @@ func Map(f *os.File, prot, flags int) (MMap, os.Error) {
 // MapRegion maps part of a file into memory.
 // The offset parameter must be a multiple of the system's page size.
 // If length < 0, the entire file will be mapped.
+// Note that because of runtime limitations, no file larger than about 2GB can
+// be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
-func MapRegion(f *os.File, length int64, prot, flags int, offset int64) (MMap, os.Error) {
+func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, os.Error) {
 	var fd uintptr
 	if flags&ANON == 0 {
 		fd = uintptr(f.Fd())
@@ -61,7 +65,7 @@ func MapRegion(f *os.File, length int64, prot, flags int, offset int64) (MMap, o
 			if err != nil {
 				return nil, err
 			}
-			length = fi.Size
+			length = int(fi.Size)
 		}
 	} else {
 		if length <= 0 {
@@ -69,18 +73,7 @@ func MapRegion(f *os.File, length int64, prot, flags int, offset int64) (MMap, o
 		}
 		fd = ^uintptr(0)
 	}
-	addr, err := mmap(length, uintptr(prot), uintptr(flags), fd, offset)
-	if err != nil {
-		return nil, err
-	}
-
-	m := MMap{}
-	dh := m.header()
-	dh.Data = addr
-	// TODO: eek, truncation
-	dh.Len = int(length)
-	dh.Cap = dh.Len
-	return m, nil
+	return mmap(length, uintptr(prot), uintptr(flags), fd, offset)
 }
 
 func (m *MMap) header() *reflect.SliceHeader {

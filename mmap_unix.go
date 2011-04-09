@@ -9,32 +9,32 @@ import (
 	"syscall"
 )
 
-func mmap(len int64, inprot, inflags, fd uintptr, off int64) (uintptr, os.Error) {
-	flags := uintptr(_MAP_SHARED)
-	prot := uintptr(_PROT_READ)
+func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, os.Error) {
+	flags := syscall.MAP_SHARED
+	prot := syscall.PROT_READ
 	switch {
 	case inprot&COPY != 0:
-		prot |= _PROT_WRITE
-		flags = _MAP_PRIVATE
+		prot |= syscall.PROT_WRITE
+		flags = syscall.MAP_PRIVATE
 	case inprot&RDWR != 0:
-		prot |= _PROT_WRITE
+		prot |= syscall.PROT_WRITE
 	}
 	if inprot&EXEC != 0 {
-		prot |= _PROT_EXEC
+		prot |= syscall.PROT_EXEC
 	}
 	if inflags&ANON != 0 {
-		flags |= _MAP_ANONYMOUS
+		flags |= syscall.MAP_ANONYMOUS
 	}
 
-	addr, errno := mmap_syscall(uintptr(len), prot, flags, fd, off)
+	b, errno := syscall.Mmap(int(fd), off, len, prot, flags)
 	if errno != 0 {
-		return 0, os.Errno(errno)
+		return nil, os.Errno(errno)
 	}
-	return addr, nil
+	return b, nil
 }
 
 func flush(addr, len uintptr) os.Error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, _MS_SYNC, 0)
+	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, syscall.MS_SYNC, 0)
 	if errno != 0 {
 		return os.Errno(errno)
 	}
