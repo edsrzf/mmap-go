@@ -25,7 +25,7 @@ func init() {
 }
 
 func openFile(flags int) *os.File {
-	f, err := os.Open(testPath, flags, 0644)
+	f, err := os.OpenFile(testPath, flags, 0644)
 	if err != nil {
 		panic(err.String())
 	}
