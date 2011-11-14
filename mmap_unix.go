@@ -23,7 +23,7 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, os.Error) {
 		prot |= syscall.PROT_EXEC
 	}
 	if inflags&ANON != 0 {
-		flags |= syscall.MAP_ANONYMOUS
+		flags |= MAP_ANONYMOUS
 	}
 
 	b, errno := syscall.Mmap(int(fd), off, len, prot, flags)
