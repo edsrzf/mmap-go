@@ -9,7 +9,7 @@ GOFILES=\
 	mmap.go
 
 GOFILES_freebsd=\
-	mmap_linux.go\
+	mmap_darwin.go\
 	mmap_unix.go
 
 GOFILES_darwin=\

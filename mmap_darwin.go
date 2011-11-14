@@ -12,6 +12,3 @@ import (
 const (
     MAP_ANONYMOUS = syscall.MAP_ANON
 )
-
-
-
