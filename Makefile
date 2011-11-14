@@ -6,15 +6,18 @@ include $(GOROOT)/src/Make.inc
 
 TARG=github.com/edsrzf/mmap-go
 GOFILES=\
-	mmap.go\
+	mmap.go
 
 GOFILES_freebsd=\
-	mmap_unix.go\
+	mmap_linux.go\
+	mmap_unix.go
 
 GOFILES_darwin=\
-	mmap_unix.go\
+	mmap_darwin.go\
+	mmap_unix.go
 
 GOFILES_linux=\
+	mmap_linux.go\
 	mmap_unix.go
 
 GOFILES_windows=\
