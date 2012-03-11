@@ -5,11 +5,10 @@
 package mmap
 
 import (
-	"os"
 	"syscall"
 )
 
-func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, os.Error) {
+func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
 	flags := syscall.MAP_SHARED
 	prot := syscall.PROT_READ
 	switch {
@@ -26,41 +25,41 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, os.Error) {
 		flags |= MAP_ANONYMOUS
 	}
 
-	b, errno := syscall.Mmap(int(fd), off, len, prot, flags)
-	if errno != 0 {
-		return nil, os.Errno(errno)
+	b, err := syscall.Mmap(int(fd), off, len, prot, flags)
+	if err != nil {
+		return nil, err
 	}
 	return b, nil
 }
 
-func flush(addr, len uintptr) os.Error {
+func flush(addr, len uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, syscall.MS_SYNC, 0)
 	if errno != 0 {
-		return os.Errno(errno)
+		return syscall.Errno(errno)
 	}
 	return nil
 }
 
-func lock(addr, len uintptr) os.Error {
+func lock(addr, len uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_MLOCK, addr, len, 0)
 	if errno != 0 {
-		return os.Errno(errno)
+		return syscall.Errno(errno)
 	}
 	return nil
 }
 
-func unlock(addr, len uintptr) os.Error {
+func unlock(addr, len uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_MUNLOCK, addr, len, 0)
 	if errno != 0 {
-		return os.Errno(errno)
+		return syscall.Errno(errno)
 	}
 	return nil
 }
 
-func unmap(addr, len uintptr) os.Error {
+func unmap(addr, len uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_MUNMAP, addr, len, 0)
 	if errno != 0 {
-		return os.Errno(errno)
+		return syscall.Errno(errno)
 	}
 	return nil
 }
