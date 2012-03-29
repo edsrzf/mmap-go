@@ -5,6 +5,7 @@
 package mmap
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"syscall"
@@ -19,9 +20,9 @@ import (
 
 // We keep this map so that we can get back the original handle from the memory address.
 var handleLock sync.Mutex
-var handleMap = map[uintptr]int32{}
+var handleMap = map[uintptr]syscall.Handle{}
 
-func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, os.Error) {
+func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	flProtect := uint32(syscall.PAGE_READONLY)
 	dwDesiredAccess := uint32(syscall.FILE_MAP_READ)
 	switch {
@@ -38,7 +39,7 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, os.Error) {
 	}
 
 	// TODO: Do we need to set some security attributes? It might help portability.
-	h, errno := syscall.CreateFileMapping(int32(hfile), nil, flProtect, 0, uint32(len), nil)
+	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, 0, uint32(len), nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
@@ -48,9 +49,8 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, os.Error) {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
 	handleLock.Lock()
-	handleMap[addr] = int32(h)
+	handleMap[addr] = h
 	handleLock.Unlock()
-
 
 	m := MMap{}
 	dh := m.header()
@@ -62,26 +62,26 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, os.Error) {
 	return m, nil
 }
 
-func flush(addr, len uintptr) os.Error {
+func flush(addr, len uintptr) error {
 	errno := syscall.FlushViewOfFile(addr, len)
 	return os.NewSyscallError("FlushViewOfFile", errno)
 }
 
-func lock(addr, len uintptr) os.Error {
+func lock(addr, len uintptr) error {
 	errno := syscall.VirtualLock(addr, len)
 	return os.NewSyscallError("VirtualLock", errno)
 }
 
-func unlock(addr, len uintptr) os.Error {
+func unlock(addr, len uintptr) error {
 	errno := syscall.VirtualUnlock(addr, len)
 	return os.NewSyscallError("VirtualUnlock", errno)
 }
 
-func unmap(addr, len uintptr) os.Error {
+func unmap(addr, len uintptr) error {
 	flush(addr, len)
-	errno := syscall.UnmapViewOfFile(addr)
-	if errno != 0 {
-		return os.NewSyscallError("UnmapViewOfFile", errno)
+	err := syscall.UnmapViewOfFile(addr)
+	if err != nil {
+		return err
 	}
 
 	handleLock.Lock()
@@ -89,10 +89,10 @@ func unmap(addr, len uintptr) os.Error {
 	handle, ok := handleMap[addr]
 	if !ok {
 		// should be impossible; we would've errored above
-		return os.NewError("unknown base address")
+		return errors.New("unknown base address")
 	}
-	handleMap[addr] = 0, false
+	delete(handleMap, addr)
 
-	e := syscall.CloseHandle(handle)
+	e := syscall.CloseHandle(syscall.Handle(handle))
 	return os.NewSyscallError("CloseHandle", e)
 }
