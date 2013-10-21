@@ -44,8 +44,6 @@ const (
 type MMap []byte
 
 // Map maps an entire file into memory.
-// Note that because of runtime limitations, no file larger than about 2GB can
-// be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
 func Map(f *os.File, prot, flags int) (MMap, error) {
 	return MapRegion(f, -1, prot, flags, 0)
@@ -54,8 +52,6 @@ func Map(f *os.File, prot, flags int) (MMap, error) {
 // MapRegion maps part of a file into memory.
 // The offset parameter must be a multiple of the system's page size.
 // If length < 0, the entire file will be mapped.
-// Note that because of runtime limitations, no file larger than about 2GB can
-// be completely mapped into memory.
 // If ANON is set in flags, f is ignored.
 func MapRegion(f *os.File, length int, prot, flags int, offset int64) (MMap, error) {
 	var fd uintptr
