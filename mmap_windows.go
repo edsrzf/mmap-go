@@ -38,22 +38,22 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 		dwDesiredAccess |= syscall.FILE_MAP_EXECUTE
 	}
 
-        // The maximum size is the area of the file, starting from 0,
-        // that we wish to allow to be mappable. It is the sum of
-        // the length the user requested, plus the offset where that length
-        // is starting from. This does not map the data into memory.
-        max_size_high := uint32((off + int64(len)) >> 32)
-        max_size_low := uint32((off + int64(len)) &  0xFFFFFFFF)
+	// The maximum size is the area of the file, starting from 0,
+	// that we wish to allow to be mappable. It is the sum of
+	// the length the user requested, plus the offset where that length
+	// is starting from. This does not map the data into memory.
+	max_size_high := uint32((off + int64(len)) >> 32)
+	max_size_low := uint32((off + int64(len)) & 0xFFFFFFFF)
 	// TODO: Do we need to set some security attributes? It might help portability.
 	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, max_size_high, max_size_low, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
 
-        // Actually map a view of the data into memory. The view's size
-        // is the length the user requested.
-        file_offset_high := uint32(off >> 32)
-        file_offset_low := uint32(off & 0xFFFFFFFF)
+	// Actually map a view of the data into memory. The view's size
+	// is the length the user requested.
+	file_offset_high := uint32(off >> 32)
+	file_offset_low := uint32(off & 0xFFFFFFFF)
 	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, file_offset_high, file_offset_low, uintptr(len))
 	if addr == 0 {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
