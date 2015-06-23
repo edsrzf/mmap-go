@@ -19,7 +19,7 @@ var testData = []byte("0123456789ABCDEF")
 var testPath = filepath.Join(os.TempDir(), "testdata")
 
 func init() {
-	f := openFile(os.O_RDWR|os.O_CREATE)
+	f := openFile(os.O_RDWR | os.O_CREATE | os.O_TRUNC)
 	f.Write(testData)
 	f.Close()
 }
@@ -99,4 +99,45 @@ func TestFlags(t *testing.T) {
 	if !bytes.Equal(fileData, testData) {
 		t.Errorf("file was modified")
 	}
+}
+
+// Test that we can map files from non-0 offsets
+// The page size on most Unixes is 4KB, but on Windows it's 64KB
+func TestNonZeroOffset(t *testing.T) {
+	const pageSize = 65536
+
+	// Create a 2-page sized file
+	bigFilePath := filepath.Join(os.TempDir(), "nonzero")
+	fileobj, err := os.OpenFile(bigFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	bigData := make([]byte, 2*pageSize, 2*pageSize)
+	fileobj.Write(bigData)
+	fileobj.Close()
+
+	// Map the first page by itself
+	fileobj, err = os.OpenFile(bigFilePath, os.O_RDONLY, 0)
+	if err != nil {
+		panic(err.Error())
+	}
+	m, err := MapRegion(fileobj, pageSize, RDONLY, 0, 0)
+	if err != nil {
+		t.Errorf("error mapping file: %s", err)
+	}
+	m.Unmap()
+	fileobj.Close()
+
+	// Map the second page by itself
+	fileobj, err = os.OpenFile(bigFilePath, os.O_RDONLY, 0)
+	if err != nil {
+		panic(err.Error())
+	}
+	m, err = MapRegion(fileobj, pageSize, RDONLY, 0, pageSize)
+	if err != nil {
+		t.Errorf("error mapping file: %s", err)
+	}
+	m.Unmap()
+	fileobj.Close()
 }
