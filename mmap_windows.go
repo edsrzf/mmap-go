@@ -52,9 +52,9 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 
 	// Actually map a view of the data into memory. The view's size
 	// is the length the user requested.
-	file_offset_high := uint32(off >> 32)
-	file_offset_low := uint32(off & 0xFFFFFFFF)
-	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, file_offset_high, file_offset_low, uintptr(len))
+	fileOffsetHigh := uint32(off >> 32)
+	fileOffsetLow := uint32(off & 0xFFFFFFFF)
+	addr, errno := syscall.MapViewOfFile(h, dwDesiredAccess, fileOffsetHigh, fileOffsetLow, uintptr(len))
 	if addr == 0 {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
