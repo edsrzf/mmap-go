@@ -42,10 +42,10 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	// that we wish to allow to be mappable. It is the sum of
 	// the length the user requested, plus the offset where that length
 	// is starting from. This does not map the data into memory.
-	max_size_high := uint32((off + int64(len)) >> 32)
-	max_size_low := uint32((off + int64(len)) & 0xFFFFFFFF)
+	maxSizeHigh := uint32((off + int64(len)) >> 32)
+	maxSizeLow := uint32((off + int64(len)) & 0xFFFFFFFF)
 	// TODO: Do we need to set some security attributes? It might help portability.
-	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, max_size_high, max_size_low, nil)
+	h, errno := syscall.CreateFileMapping(syscall.Handle(hfile), nil, flProtect, maxSizeHigh, maxSizeLow, nil)
 	if h == 0 {
 		return nil, os.NewSyscallError("CreateFileMapping", errno)
 	}
