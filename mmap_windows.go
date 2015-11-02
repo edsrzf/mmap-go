@@ -73,7 +73,20 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 
 func flush(addr, len uintptr) error {
 	errno := syscall.FlushViewOfFile(addr, len)
-	return os.NewSyscallError("FlushViewOfFile", errno)
+	if errno != nil {
+		return os.NewSyscallError("FlushViewOfFile", errno)
+	}
+
+	handleLock.Lock()
+	defer handleLock.Unlock()
+	handle, ok := handleMap[addr]
+	if !ok {
+		// should be impossible; we would've errored above
+		return errors.New("unknown base address")
+	}
+
+	errno = FlushFileBuffers(handle)
+	return os.NewSyscallError("FlushFileBuffers", errno)
 }
 
 func lock(addr, len uintptr) error {
