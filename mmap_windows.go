@@ -85,7 +85,7 @@ func flush(addr, len uintptr) error {
 		return errors.New("unknown base address")
 	}
 
-	errno = FlushFileBuffers(handle)
+	errno = syscall.FlushFileBuffers(handle)
 	return os.NewSyscallError("FlushFileBuffers", errno)
 }
 
