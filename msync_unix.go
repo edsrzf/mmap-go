@@ -10,10 +10,5 @@ import (
 	"syscall"
 )
 
-func msync(addr, len uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, len, syscall.MS_SYNC)
-	if errno != 0 {
-		return syscall.Errno(errno)
-	}
-	return nil
-}
+const _SYS_MSYNC = syscall.SYS_MSYNC
+const _MS_SYNC = syscall.MS_SYNC
