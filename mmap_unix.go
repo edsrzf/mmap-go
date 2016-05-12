@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin dragonfly freebsd linux openbsd solaris
+// +build darwin dragonfly freebsd linux openbsd solaris netbsd
 
 package mmap
 
@@ -35,7 +35,7 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
 }
 
 func flush(addr, len uintptr) error {
-	_, _, errno := syscall.Syscall(syscall.SYS_MSYNC, addr, len, syscall.MS_SYNC)
+	_, _, errno := syscall.Syscall(_SYS_MSYNC, addr, len, _MS_SYNC)
 	if errno != 0 {
 		return syscall.Errno(errno)
 	}
