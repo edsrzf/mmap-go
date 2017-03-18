@@ -138,6 +138,15 @@ func TestNonZeroOffset(t *testing.T) {
 	if err != nil {
 		t.Errorf("error mapping file: %s", err)
 	}
-	m.Unmap()
+	err = m.Unmap()
+	if err != nil {
+		t.Error(err)
+	}
+
+	m, err = MapRegion(fileobj, pageSize, RDONLY, 0, 1)
+	if err == nil {
+		t.Error("expect error because offset is not multiple of page size")
+	}
+
 	fileobj.Close()
 }
