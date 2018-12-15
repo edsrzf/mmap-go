@@ -20,8 +20,14 @@ import (
 // not a struct, so it's convenient to manipulate.
 
 // We keep this map so that we can get back the original handle from the memory address.
+
+type addrinfo struct {
+	file    windows.Handle
+	mapview windows.Handle
+}
+
 var handleLock sync.Mutex
-var handleMap = map[uintptr]windows.Handle{}
+var handleMap = map[uintptr]*addrinfo{}
 
 func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	flProtect := uint32(windows.PAGE_READONLY)
@@ -60,7 +66,10 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 		return nil, os.NewSyscallError("MapViewOfFile", errno)
 	}
 	handleLock.Lock()
-	handleMap[addr] = h
+	handleMap[addr] = &addrinfo{
+		file:    windows.Handle(hfile),
+		mapview: h,
+	}
 	handleLock.Unlock()
 
 	m := MMap{}
@@ -86,7 +95,7 @@ func flush(addr, len uintptr) error {
 		return errors.New("unknown base address")
 	}
 
-	errno = windows.FlushFileBuffers(handle)
+	errno = windows.FlushFileBuffers(handle.file)
 	return os.NewSyscallError("FlushFileBuffers", errno)
 }
 
@@ -100,8 +109,11 @@ func unlock(addr, len uintptr) error {
 	return os.NewSyscallError("VirtualUnlock", errno)
 }
 
-func unmap(addr, len uintptr) error {
-	flush(addr, len)
+func unmap(addr, len uintptr) (err error) {
+	err = flush(addr, len)
+	if err != nil {
+		return err
+	}
 	// Lock the UnmapViewOfFile along with the handleMap deletion.
 	// As soon as we unmap the view, the OS is free to give the
 	// same addr to another new map. We don't want another goroutine
@@ -109,7 +121,7 @@ func unmap(addr, len uintptr) error {
 	// we're trying to remove our old addr/handle pair.
 	handleLock.Lock()
 	defer handleLock.Unlock()
-	err := windows.UnmapViewOfFile(addr)
+	err = windows.UnmapViewOfFile(addr)
 	if err != nil {
 		return err
 	}
@@ -121,6 +133,6 @@ func unmap(addr, len uintptr) error {
 	}
 	delete(handleMap, addr)
 
-	e := windows.CloseHandle(windows.Handle(handle))
+	e := windows.CloseHandle(windows.Handle(handle.mapview))
 	return os.NewSyscallError("CloseHandle", e)
 }
