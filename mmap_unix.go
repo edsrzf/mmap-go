@@ -34,34 +34,18 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
 	return b, nil
 }
 
-func flush(addr, len uintptr) error {
-	_, _, errno := unix.Syscall(unix.SYS_MSYNC, addr, len, unix.MS_SYNC)
-	if errno != 0 {
-		return unix.Errno(errno)
-	}
-	return nil
+func (m MMap) flush() error {
+	return unix.Msync([]byte(m), unix.MS_SYNC)
 }
 
-func lock(addr, len uintptr) error {
-	_, _, errno := unix.Syscall(unix.SYS_MLOCK, addr, len, 0)
-	if errno != 0 {
-		return unix.Errno(errno)
-	}
-	return nil
+func (m MMap) lock() error {
+	return unix.Mlock([]byte(m))
 }
 
-func unlock(addr, len uintptr) error {
-	_, _, errno := unix.Syscall(unix.SYS_MUNLOCK, addr, len, 0)
-	if errno != 0 {
-		return unix.Errno(errno)
-	}
-	return nil
+func (m MMap) unlock() error {
+	return unix.Munlock([]byte(m))
 }
 
-func unmap(addr, len uintptr) error {
-	_, _, errno := unix.Syscall(unix.SYS_MUNMAP, addr, len, 0)
-	if errno != 0 {
-		return unix.Errno(errno)
-	}
-	return nil
+func (m MMap) unmap() error {
+	return unix.Munmap([]byte(m))
 }

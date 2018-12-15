@@ -81,7 +81,8 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	return m, nil
 }
 
-func flush(addr, len uintptr) error {
+func (m MMap) flush() error {
+	addr, len := m.addrLen()
 	errno := windows.FlushViewOfFile(addr, len)
 	if errno != nil {
 		return os.NewSyscallError("FlushViewOfFile", errno)
@@ -99,21 +100,25 @@ func flush(addr, len uintptr) error {
 	return os.NewSyscallError("FlushFileBuffers", errno)
 }
 
-func lock(addr, len uintptr) error {
+func (m MMap) lock() error {
+	addr, len := m.addrLen()
 	errno := windows.VirtualLock(addr, len)
 	return os.NewSyscallError("VirtualLock", errno)
 }
 
-func unlock(addr, len uintptr) error {
+func (m MMap) unlock() error {
+	addr, len := m.addrLen()
 	errno := windows.VirtualUnlock(addr, len)
 	return os.NewSyscallError("VirtualUnlock", errno)
 }
 
-func unmap(addr, len uintptr) (err error) {
-	err = flush(addr, len)
+func (m MMap) unmap() error {
+	err := m.flush()
 	if err != nil {
 		return err
 	}
+
+	addr := m.header().Data
 	// Lock the UnmapViewOfFile along with the handleMap deletion.
 	// As soon as we unmap the view, the OS is free to give the
 	// same addr to another new map. We don't want another goroutine
