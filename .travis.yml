@@ -1,8 +1,8 @@
 language: go
 os:
-  - windows
   - linux
   - osx
+  - windows
 go:
   - 1.11.4
 env:
