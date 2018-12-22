@@ -6,3 +6,5 @@
 _obj
 _test
 testdata
+/.idea
+*.iml
