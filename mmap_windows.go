@@ -22,8 +22,9 @@ import (
 // We keep this map so that we can get back the original handle from the memory address.
 
 type addrinfo struct {
-	file    windows.Handle
-	mapview windows.Handle
+	file    	windows.Handle
+	mapview 	windows.Handle
+	dwAccess 	uint32
 }
 
 var handleLock sync.Mutex
@@ -69,6 +70,7 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	handleMap[addr] = &addrinfo{
 		file:    windows.Handle(hfile),
 		mapview: h,
+		dwAccess: dwDesiredAccess,
 	}
 	handleLock.Unlock()
 
@@ -113,12 +115,19 @@ func (m MMap) unlock() error {
 }
 
 func (m MMap) unmap() error {
-	err := m.flush()
-	if err != nil {
-		return err
+	addr := m.header().Data
+	handle, ok := handleMap[addr]
+	if !ok {
+		return errors.New("unknown base address")
 	}
 
-	addr := m.header().Data
+	if handle.dwAccess != uint32(windows.FILE_MAP_READ) {
+		err := m.flush()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Lock the UnmapViewOfFile along with the handleMap deletion.
 	// As soon as we unmap the view, the OS is free to give the
 	// same addr to another new map. We don't want another goroutine
@@ -126,17 +135,12 @@ func (m MMap) unmap() error {
 	// we're trying to remove our old addr/handle pair.
 	handleLock.Lock()
 	defer handleLock.Unlock()
-	err = windows.UnmapViewOfFile(addr)
+	delete(handleMap, addr)
+
+	err := windows.UnmapViewOfFile(addr)
 	if err != nil {
 		return err
 	}
-
-	handle, ok := handleMap[addr]
-	if !ok {
-		// should be impossible; we would've errored above
-		return errors.New("unknown base address")
-	}
-	delete(handleMap, addr)
 
 	e := windows.CloseHandle(windows.Handle(handle.mapview))
 	return os.NewSyscallError("CloseHandle", e)
