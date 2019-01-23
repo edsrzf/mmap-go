@@ -101,7 +101,7 @@ func (m MMap) flush() error {
 		return errors.New("unknown base address")
 	}
 
-	if handle.writable {
+	if handle.writable && handle.file != windows.Handle(^uintptr(0)) {
 		if err := windows.FlushFileBuffers(handle.file); err != nil {
 			return os.NewSyscallError("FlushFileBuffers", err)
 		}
