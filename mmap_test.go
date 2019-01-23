@@ -150,3 +150,24 @@ func TestNonZeroOffset(t *testing.T) {
 
 	fileobj.Close()
 }
+
+func TestAnonymousMapping(t *testing.T) {
+	const size = 4 * 1024
+
+	// Make an anonymous region
+	mem, err := MapRegion(nil, size, RDWR, ANON, 0)
+	if err != nil {
+		t.Fatalf("failed to allocate memory for buffer: %v", err)
+	}
+
+	// Check memory writable
+	for i := 0; i < size; i++ {
+		mem[i] = 0x55
+	}
+
+	// And unmap it
+	err = mem.Unmap()
+	if err != nil {
+		t.Fatalf("failed to unmap memory for buffer: %v", err)
+	}
+}
