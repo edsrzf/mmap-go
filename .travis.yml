@@ -4,7 +4,8 @@ os:
   - osx
   - windows
 go:
-  - 1.11.4
+  - 1.14.x
+  - 1.15.x
 env:
   global:
     - GO111MODULE=on
