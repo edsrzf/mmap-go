@@ -1,6 +1,7 @@
 mmap-go
 =======
 ![Build Status](https://github.com/edsrzf/mmap-go/actions/workflows/build-test.yml/badge.svg)
+[![Go Reference](https://pkg.go.dev/badge/github.com/edsrzf/mmap-go.svg)](https://pkg.go.dev/github.com/edsrzf/mmap-go)
 
 mmap-go is a portable mmap package for the [Go programming language](http://golang.org).
 
