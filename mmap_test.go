@@ -9,6 +9,7 @@ package mmap
 
 import (
 	"bytes"
+	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -170,4 +171,46 @@ func TestAnonymousMapping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to unmap memory for buffer: %v", err)
 	}
+}
+
+func TestFaultError(t *testing.T) {
+	var size = os.Getpagesize()
+
+	// Make an anonymous region
+	faultyMmap, err := MapRegion(nil, size, RDWR, ANON, 0)
+	if err != nil {
+		t.Fatalf("failed to allocate memory for buffer: %v", err)
+	}
+	reader := faultyMmap.Reader()
+
+	// To cause a fault on our reads, unmap the region
+	faultyMmap.Unmap()
+
+	var buffer = make([]byte, size)
+
+	// Test Read
+	_, err = reader.Read(buffer)
+	if err == nil {
+		t.Fatalf("No error on Read() on invalid MMAP")
+	}
+	t.Log(err)
+
+	// Test ReadAt
+	_, err = reader.ReadAt(buffer, 10)
+	if err == nil {
+		t.Fatalf("No error on ReadAt() on invalid MMAP")
+	}
+	t.Log(err)
+
+	// Test WriteTo
+	_, err = reader.WriteTo(bytes.NewBuffer(buffer))
+	if err == nil {
+		t.Fatalf("No error on WriteTo() on invalid MMAP")
+	}
+	t.Log(err)
+
+	// Test that other, non-IO functions don't fault
+	reader.Size()
+	reader.Seek(10, io.SeekStart)
+	reader.Len()
 }

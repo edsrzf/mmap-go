@@ -15,6 +15,7 @@
 package mmap
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"reflect"
@@ -114,4 +115,13 @@ func (m *MMap) Unmap() error {
 	err := m.unmap()
 	*m = nil
 	return err
+}
+
+// Reader returns a reader on the memory mapped region that handles potentially occurring
+// faults (such as page read errors).
+func (m MMap) Reader() *FaultReader {
+	return &FaultReader{
+		mmap:   m,
+		reader: bytes.NewReader(m),
+	}
 }
