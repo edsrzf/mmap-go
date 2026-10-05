@@ -27,6 +27,11 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
 		flags |= unix.MAP_ANON
 	}
 
+	flags |= int(inflags)
+	if inprot&COPY != 0 {
+		flags &^= unix.MAP_SHARED
+	}
+
 	b, err := unix.Mmap(int(fd), off, len, prot, flags)
 	if err != nil {
 		return nil, err

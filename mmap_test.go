@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -171,3 +172,79 @@ func TestAnonymousMapping(t *testing.T) {
 		t.Fatalf("failed to unmap memory for buffer: %v", err)
 	}
 }
+
+func TestAnonymousMappingCopy(t *testing.T) {
+	const size = 4 * 1024
+
+	// Make an anonymous copy-on-write region
+	mem, err := MapRegion(nil, size, COPY, ANON, 0)
+	if err != nil {
+		t.Fatalf("failed to allocate memory for copy buffer: %v", err)
+	}
+
+	for i := 0; i < size; i++ {
+		mem[i] = 0xAA
+	}
+
+	err = mem.Unmap()
+	if err != nil {
+		t.Fatalf("failed to unmap memory for copy buffer: %v", err)
+	}
+}
+
+func TestUserFlagsPreserved(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("skipping linux-specific flag tests on non-linux OS")
+	}
+
+	const (
+		flagMapNoreserve = 0x4000
+		flagMapPopulate  = 0x8000
+		flagMapHugetlb   = 0x40000
+	)
+
+	// Test mapping a file with MAP_POPULATE flag
+	f := openFile(os.O_RDWR)
+	defer f.Close()
+	m, err := Map(f, RDWR, flagMapPopulate)
+	if err != nil {
+		t.Fatalf("Map with MAP_POPULATE failed: %v", err)
+	}
+	if !bytes.Equal(m, testData) {
+		t.Fatalf("mmap != testData: %q, %q", m, testData)
+	}
+	if err := m.Unmap(); err != nil {
+		t.Fatalf("failed to unmap MAP_POPULATE region: %v", err)
+	}
+
+	// Test mapping a file region with MAP_NORESERVE flag
+	mRegion, err := MapRegion(f, len(testData), RDONLY, flagMapNoreserve, 0)
+	if err != nil {
+		t.Fatalf("MapRegion with MAP_NORESERVE failed: %v", err)
+	}
+	if !bytes.Equal(mRegion, testData) {
+		t.Fatalf("mRegion != testData: %q, %q", mRegion, testData)
+	}
+	if err := mRegion.Unmap(); err != nil {
+		t.Fatalf("failed to unmap MAP_NORESERVE region: %v", err)
+	}
+
+	// Test anonymous mapping combined with user flags
+	mAnon, err := MapRegion(nil, 4096, RDWR, ANON|flagMapNoreserve, 0)
+	if err != nil {
+		t.Fatalf("MapRegion with ANON|MAP_NORESERVE failed: %v", err)
+	}
+	mAnon[0] = 0x5A
+	if err := mAnon.Unmap(); err != nil {
+		t.Fatalf("failed to unmap ANON|MAP_NORESERVE region: %v", err)
+	}
+
+	// Test that flags are not ignored: MAP_HUGETLB requires allocated hugepages in Linux.
+	// When passed to unix.Mmap, the kernel fails with EINVAL if hugepages are unavailable.
+	// If flags were ignored, this call would succeed.
+	_, err = Map(f, RDWR, flagMapHugetlb)
+	if err == nil {
+		t.Error("expected error when mapping with MAP_HUGETLB without hugepages, but got nil; user flags may have been dropped")
+	}
+}
+
