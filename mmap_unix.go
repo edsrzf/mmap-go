@@ -23,6 +23,9 @@ func mmap(len int, inprot, inflags, fd uintptr, off int64) ([]byte, error) {
 	if inprot&EXEC != 0 {
 		prot |= unix.PROT_EXEC
 	}
+	if inflags&PRIVATE != 0 {
+		flags = unix.MAP_PRIVATE
+	}
 	if inflags&ANON != 0 {
 		flags |= unix.MAP_ANON
 	}

@@ -38,6 +38,17 @@ const (
 const (
 	// If the ANON flag is set, the mapped memory will not be backed by a file.
 	ANON = 1 << iota
+	// If the PRIVATE flag is set, the mapped memory will be a private mapping.
+	// Writes (if allowed) will affect memory, but the underlying file will remain
+	// unchanged. When combined with RDONLY, writes are not allowed and the mapping
+	// is private (MAP_PRIVATE on Unix systems instead of MAP_SHARED).
+	PRIVATE
+)
+
+// MAP_ANON and MAP_PRIVATE are aliases for ANON and PRIVATE.
+const (
+	MAP_ANON    = ANON
+	MAP_PRIVATE = PRIVATE
 )
 
 // MMap represents a file mapped into memory.

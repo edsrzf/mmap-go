@@ -35,7 +35,7 @@ func mmap(len int, prot, flags, hfile uintptr, off int64) ([]byte, error) {
 	dwDesiredAccess := uint32(windows.FILE_MAP_READ)
 	writable := false
 	switch {
-	case prot&COPY != 0:
+	case prot&COPY != 0 || (prot&RDWR != 0 && flags&PRIVATE != 0):
 		flProtect = windows.PAGE_WRITECOPY
 		dwDesiredAccess = windows.FILE_MAP_COPY
 		writable = true

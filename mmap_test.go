@@ -9,9 +9,12 @@ package mmap
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -170,4 +173,145 @@ func TestAnonymousMapping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to unmap memory for buffer: %v", err)
 	}
+}
+
+func checkLinuxMappingPrivate(t *testing.T, m MMap, wantPrivate bool) {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	mapsData, err := ioutil.ReadFile("/proc/self/maps")
+	if err != nil {
+		t.Fatalf("failed to read /proc/self/maps: %v", err)
+	}
+	addr, _ := m.addrLen()
+	prefix := fmt.Sprintf("%x-", addr)
+	for _, line := range strings.Split(string(mapsData), "\n") {
+		if strings.HasPrefix(line, prefix) {
+			fields := strings.Fields(line)
+			if len(fields) >= 2 {
+				perms := fields[1]
+				if len(perms) >= 4 {
+					isPrivate := perms[3] == 'p'
+					if isPrivate != wantPrivate {
+						t.Errorf("mapping perms %q, want private=%v (line: %s)", perms, wantPrivate, line)
+					}
+					return
+				}
+			}
+		}
+	}
+	t.Errorf("mapping address %x not found in /proc/self/maps", addr)
+}
+
+func TestPrivateReadOnly(t *testing.T) {
+	f := openFile(os.O_RDONLY)
+	defer f.Close()
+	m, err := Map(f, RDONLY, PRIVATE)
+	if err != nil {
+		t.Fatalf("error mapping: %s", err)
+	}
+	defer m.Unmap()
+
+	if !bytes.Equal(testData, m) {
+		t.Errorf("mmap != testData: %q, %q", m, testData)
+	}
+	if err := m.Flush(); err != nil {
+		t.Errorf("error flushing private read-only mapping: %s", err)
+	}
+
+	checkLinuxMappingPrivate(t, m, true)
+
+	// Verify shared mapping uses shared perms on Linux for contrast
+	shared, err := Map(f, RDONLY, 0)
+	if err != nil {
+		t.Fatalf("error mapping shared: %s", err)
+	}
+	defer shared.Unmap()
+	checkLinuxMappingPrivate(t, shared, false)
+}
+
+func TestMapPrivateAlias(t *testing.T) {
+	f := openFile(os.O_RDONLY)
+	defer f.Close()
+	m, err := Map(f, RDONLY, MAP_PRIVATE)
+	if err != nil {
+		t.Fatalf("error mapping: %s", err)
+	}
+	defer m.Unmap()
+
+	if !bytes.Equal(testData, m) {
+		t.Errorf("mmap != testData: %q, %q", m, testData)
+	}
+	checkLinuxMappingPrivate(t, m, true)
+}
+
+func TestPrivateReadOnlyRegion(t *testing.T) {
+	f := openFile(os.O_RDONLY)
+	defer f.Close()
+	const regionLen = 4
+	m, err := MapRegion(f, regionLen, RDONLY, PRIVATE, 0)
+	if err != nil {
+		t.Fatalf("error mapping region: %s", err)
+	}
+	defer m.Unmap()
+
+	if !bytes.Equal(testData[:regionLen], m) {
+		t.Errorf("mmap region != testData prefix: %q, %q", m, testData[:regionLen])
+	}
+	checkLinuxMappingPrivate(t, m, true)
+}
+
+func TestPrivateReadWrite(t *testing.T) {
+	f := openFile(os.O_RDWR)
+	defer f.Close()
+	m, err := Map(f, RDWR, PRIVATE)
+	if err != nil {
+		t.Fatalf("error mapping: %s", err)
+	}
+	defer m.Unmap()
+
+	if !bytes.Equal(testData, m) {
+		t.Errorf("mmap != testData: %q, %q", m, testData)
+	}
+
+	m[9] = 'Z'
+	if err := m.Flush(); err != nil {
+		t.Errorf("error flushing: %s", err)
+	}
+	if m[9] != 'Z' {
+		t.Errorf("memory byte not updated")
+	}
+
+	// Seek to beginning before reading
+	if _, err := f.Seek(0, 0); err != nil {
+		t.Fatalf("error seeking file: %s", err)
+	}
+	fileData, err := ioutil.ReadAll(f)
+	if err != nil {
+		t.Fatalf("error reading file: %s", err)
+	}
+	if !bytes.Equal(fileData, testData) {
+		t.Errorf("file was modified despite private mapping")
+	}
+
+	checkLinuxMappingPrivate(t, m, true)
+}
+
+func TestPrivateAnonymousMapping(t *testing.T) {
+	const size = 4 * 1024
+	mem, err := MapRegion(nil, size, RDWR, ANON|PRIVATE, 0)
+	if err != nil {
+		t.Fatalf("failed to allocate anonymous private buffer: %v", err)
+	}
+	defer mem.Unmap()
+
+	for i := 0; i < size; i++ {
+		mem[i] = 0xAA
+	}
+	for i := 0; i < size; i++ {
+		if mem[i] != 0xAA {
+			t.Fatalf("corrupted memory at index %d: expected 0xAA, got %x", i, mem[i])
+		}
+	}
+	checkLinuxMappingPrivate(t, mem, true)
 }
